@@ -93,7 +93,7 @@ def _extract_issuer(header_raw: str | None) -> str | None:
     if not lines:
         return None
     stop_rx = re.compile(
-        r"^(Юр\.адрес|Адрес|ИНН|КПП|ОГРН|тел|телефон|факс|e-mail|сайт|http|www|@)",
+        r"^(Юр\.адрес|Адрес|ИНН|КПП|ОГРН|тел|телефон|факс|e-mail|сайт|http|www|@|пл)",
         re.IGNORECASE,
     )
     collected: list[str] = []
