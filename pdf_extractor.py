@@ -36,11 +36,31 @@ def render_page_to_image(page: fitz.Page, dpi: int) -> Image.Image:
     return img
 
 
-def deskew_and_threshold(image: Image.Image) -> Image.Image:
+def deskew_and_threshold(
+    image: Image.Image,
+    padding: int = 20,
+    padding_ratio: float = 0.02,
+    min_angle: float = 0.1,
+    top_padding_multiplier: int = 3,
+) -> Image.Image:
     # Convert to grayscale and apply Otsu thresholding for OCR readiness.
     image_np = np.array(image)
     gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
     _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
+    # Add padding to prevent clipping near the page edges during deskew.
+    dynamic_padding = max(padding, int(min(binary.shape[:2]) * padding_ratio))
+    top_padding = dynamic_padding * top_padding_multiplier
+    if dynamic_padding > 0:
+        binary = cv2.copyMakeBorder(
+            binary,
+            top_padding,
+            dynamic_padding,
+            dynamic_padding,
+            dynamic_padding,
+            borderType=cv2.BORDER_CONSTANT,
+            value=255,
+        )
 
     # Estimate skew angle from foreground pixels and rotate to deskew.
     coords = np.column_stack(np.where(binary < 255))
@@ -53,11 +73,26 @@ def deskew_and_threshold(image: Image.Image) -> Image.Image:
         angle = -(90 + angle)
     else:
         angle = -angle
+    if abs(angle) < min_angle:
+        return Image.fromarray(binary)
 
     (h, w) = binary.shape[:2]
     center = (w // 2, h // 2)
     rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-    rotated = cv2.warpAffine(binary, rotation_matrix, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    abs_cos = abs(rotation_matrix[0, 0])
+    abs_sin = abs(rotation_matrix[0, 1])
+    bound_w = int(h * abs_sin + w * abs_cos)
+    bound_h = int(h * abs_cos + w * abs_sin)
+    rotation_matrix[0, 2] += bound_w / 2 - center[0]
+    rotation_matrix[1, 2] += bound_h / 2 - center[1]
+    rotated = cv2.warpAffine(
+        binary,
+        rotation_matrix,
+        (bound_w, bound_h),
+        flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=255,
+    )
     return Image.fromarray(rotated)
 
 
@@ -94,7 +129,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=None, help="Output JSON file (default: stdout)")
     parser.add_argument("--min-text-chars", type=int, default=50, help="Minimum text length to skip OCR")
     parser.add_argument("--dpi", type=int, default=300, help="Render DPI for OCR")
-    parser.add_argument("--lang", type=str, default="rus", help="Tesseract language (default: rus)")
+    parser.add_argument(
+        "--lang",
+        type=str,
+        default="rus+eng",
+        help="Tesseract language (default: rus+eng)",
+    )
     return parser.parse_args()
 
 
