@@ -42,8 +42,7 @@ class Department:
 class KeywordSpec:
     text: str
     lemmas: list[str]
-    lemma: str | None = None
-
+    anchors: list[str]
 
 @dataclass
 class DepartmentsCatalog:
