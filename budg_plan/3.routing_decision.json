@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "request_id": "REQ-2f9648dd-d74d-481d-a99d-e175f133a697",
+  "created_at": "2026-01-16T11:31:49.609883Z",
+  "input": {
+    "source_channel": "manual_upload",
+    "file": {
+      "filename": "3.pdf",
+      "pages": 3
+    },
+    "metadata": {}
+  },
+  "extraction": {
+    "text_source": "native",
+    "language": "ru",
+    "page_map": [
+      {
+        "page": 1,
+        "text_span_id": "p1",
+        "char_start": 0,
+        "char_end": 1972
+      },
+      {
+        "page": 2,
+        "text_span_id": "p2",
+        "char_start": 1974,
+        "char_end": 4594
+      },
+      {
+        "page": 3,
+        "text_span_id": "p3",
+        "char_start": 4596,
+        "char_end": 6574
+      }
+    ],
+    "quality": {
+      "ocr_confidence": 0.95,
+      "has_tables": false,
+      "has_stamps_signatures": "unknown",
+      "warnings": []
+    }
+  },
+  "understanding": {
+    "doc_type": "unknown",
+    "summary": "О предоставлении документов",
+    "topics": [
+      "reporting"
+    ],
+    "urgency": {
+      "level": "normal",
+      "signals": []
+    },
+    "entities": {
+      "organizations": [],
+      "people": [],
+      "numbers": {
+        "contract_numbers": [],
+        "invoice_numbers": [],
+        "letter_numbers": [],
+        "law_refs": []
+      },
+      "dates": [],
+      "amounts": [],
+      "locations": []
+    }
+  },
+  "routing": {
+    "mode": "auto_route_allowed",
+    "suggestions": [
+      {
+        "department_id": "FIN_BUDG_INTERBUDG",
+        "department_name": "Отдел бюджетного планирования и межбюджетных отношений",
+        "confidence": 1.0,
+        "priority": "primary",
+        "why": "Совпали ключевые слова; сработали правила триажа",
+        "matched_signals": {
+          "keywords": [
+            "межбюджетные трансферты",
+            "субвенция",
+            "резервный фонд"
+          ],
+          "rules_triggered": [
+            "Предложить Юридический отдел как обязательного соисполнителя; этот отдел — только если предмет письма относится к межбюджетным отношениям/бюджетному процессу."
+          ],
+          "semantic_score": 0.0
+        },
+        "evidence": [],
+        "next_actions": []
+      }
+    ],
+    "final_recommendation": {
+      "department_ids": [
+        "FIN_BUDG_INTERBUDG"
+      ],
+      "confidence": 1.0,
+      "comment": "Heuristic selection based on keyword scores."
+    },
+    "needs_human_review": true,
+    "review_reasons": [
+      "Предложить Юридический отдел как обязательного соисполнителя; этот отдел — только если предмет письма относится к межбюджетным отношениям/бюджетному процессу."
+    ]
+  },
+  "compliance": {
+    "sensitive_flags": [],
+    "safe_to_log_text": "yes",
+    "masking": {
+      "enabled": false,
+      "masked_fields": []
+    }
+  },
+  "diagnostics": {
+    "processing_time_ms": 51,
+    "model": {
+      "name": "heuristic-router",
+      "version": "dev"
+    },
+    "trace": {
+      "rules_version": "dev",
+      "catalog_version": "dev"
+    },
+    "errors": [],
+    "warnings": []
+  }
+}

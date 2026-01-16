@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0",
+  "request_id": "REQ-6335a32d-733c-4057-bba2-313121ded9ec",
+  "created_at": "2026-01-16T10:46:53.235942Z",
+  "input": {
+    "source_channel": "manual_upload",
+    "file": {
+      "filename": "1.pdf",
+      "pages": 1
+    },
+    "metadata": {}
+  },
+  "extraction": {
+    "text_source": "native",
+    "language": "ru",
+    "page_map": [
+      {
+        "page": 1,
+        "text_span_id": "p1",
+        "char_start": 0,
+        "char_end": 1515
+      }
+    ],
+    "quality": {
+      "ocr_confidence": 0.95,
+      "has_tables": false,
+      "has_stamps_signatures": "unknown",
+      "warnings": []
+    }
+  },
+  "understanding": {
+    "doc_type": "unknown",
+    "summary": "Министерство финансов Российской Федерации просит обеспечить своевременное и качественное представление информации в соответствии с актуализированным Порядком проведения мониторинга местных бюджетов и",
+    "topics": [
+      "reporting"
+    ],
+    "urgency": {
+      "level": "normal",
+      "signals": []
+    },
+    "entities": {
+      "organizations": [
+        {
+          "name": "Руководителям финансовых органов субъектов Российской Федерации",
+          "role": "mentioned"
+        }
+      ],
+      "people": [],
+      "numbers": {
+        "contract_numbers": [],
+        "invoice_numbers": [],
+        "letter_numbers": [],
+        "law_refs": []
+      },
+      "dates": [],
+      "amounts": [],
+      "locations": []
+    }
+  },
+  "routing": {
+    "mode": "auto_route_allowed",
+    "suggestions": [
+      {
+        "department_id": "FIN_BUDG_INTERBUDG",
+        "department_name": "Отдел бюджетного планирования и межбюджетных отношений",
+        "confidence": 1.0,
+        "priority": "primary",
+        "why": "Ключевых совпадений нет; сработали правила триажа",
+        "matched_signals": {
+          "keywords": [],
+          "rules_triggered": [
+            "Маршрутизировать в этот отдел с высоким приоритетом."
+          ],
+          "semantic_score": 0.0
+        },
+        "evidence": [],
+        "next_actions": []
+      }
+    ],
+    "final_recommendation": {
+      "department_ids": [
+        "FIN_BUDG_INTERBUDG"
+      ],
+      "confidence": 1.0,
+      "comment": "Heuristic selection based on keyword scores."
+    },
+    "needs_human_review": false,
+    "review_reasons": []
+  },
+  "compliance": {
+    "sensitive_flags": [],
+    "safe_to_log_text": "yes",
+    "masking": {
+      "enabled": false,
+      "masked_fields": []
+    }
+  },
+  "diagnostics": {
+    "processing_time_ms": 28,
+    "model": {
+      "name": "heuristic-router",
+      "version": "dev"
+    },
+    "trace": {
+      "rules_version": "dev",
+      "catalog_version": "dev"
+    },
+    "errors": [],
+    "warnings": []
+  }
+}

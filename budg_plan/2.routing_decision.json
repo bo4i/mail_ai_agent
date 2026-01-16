@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0",
+  "request_id": "REQ-a5b2b0b5-74c2-4d0b-b023-b5b7e0da8174",
+  "created_at": "2026-01-16T07:21:11.477764Z",
+  "input": {
+    "source_channel": "manual_upload",
+    "file": {
+      "filename": "2.pdf",
+      "pages": 1
+    },
+    "metadata": {}
+  },
+  "extraction": {
+    "text_source": "native",
+    "language": "ru",
+    "page_map": [
+      {
+        "page": 1,
+        "text_span_id": "p1",
+        "char_start": 0,
+        "char_end": 1519
+      }
+    ],
+    "quality": {
+      "ocr_confidence": 0.95,
+      "has_tables": false,
+      "has_stamps_signatures": "unknown",
+      "warnings": []
+    }
+  },
+  "understanding": {
+    "doc_type": "unknown",
+    "summary": "ПРАВОВОЕ УПРАВЛЕНИЕ ПРАВИТЕЛЬСТВА ЛИПЕЦКОЙ ОБЛАСТИ пл. Ленина - Соборная, 1, г. Липецк, 398000 телефон (4742) 22-84-70 липецкаяобласть.рф e-mail: pravo@admlr.lipetsk.ru На № от Руководителям управлени",
+    "topics": [],
+    "urgency": {
+      "level": "normal",
+      "signals": []
+    },
+    "entities": {
+      "organizations": [
+        {
+          "name": "ПРАВОВОЕ УПРАВЛЕНИЕ ПРАВИТЕЛЬСТВА ЛИПЕЦКОЙ ОБЛАСТИ",
+          "role": "sender"
+        },
+        {
+          "name": "Руководителям управлений, отделов, входящих в структуру Правительства Липецкой области Руководителям исполнительных органов Липецкой области Уважаемые коллеги! В связи с необходимостью представления в Министерство юстиции Российской Федерации информации о результатах рассмотрения заключений независимой антикоррупционной экспертизы на региональные нормативные правовые акты и их проекты, поступивших за период с 01.01.2025 по 31.12.2025, просим в срок до 23.01.2026 представить в правовое управление Правительства Липецкой области соответствующие сведения по прилагаемой форме. При этом обращаем внимание, что согласно статье 5 Федерального закона от 17.07.2009 № 172-ФЗ «Об антикоррупционной экспертизе нормативных правовых актов и проектов нормативных правовых актов» независимая антикоррупционная экспертиза нормативных правовых актов и их проектов проводится в порядке, предусмотренном нормативными правовыми актами Российской Федерации. Правила проведения независимой антикоррупционной экспертизы нормативных правовых актов и проектов нормативных правовых актов утверждены постановлением Правительства Российской Федерации от 26.02.2010 № 96 «Об антикоррупционной экспертизе нормативных правовых актов и проектов нормативных правовых актов». Начальник управления",
+          "role": "mentioned"
+        }
+      ],
+      "people": [],
+      "numbers": {
+        "contract_numbers": [],
+        "invoice_numbers": [],
+        "letter_numbers": [],
+        "law_refs": []
+      },
+      "dates": [],
+      "amounts": [],
+      "locations": []
+    }
+  },
+  "routing": {
+    "mode": "auto_route_allowed",
+    "suggestions": [
+      {
+        "department_id": "FIN_BUDG_INTERBUDG",
+        "department_name": "Отдел бюджетного планирования и межбюджетных отношений",
+        "confidence": 0.0,
+        "priority": "primary",
+        "why": "Ключевых совпадений нет",
+        "matched_signals": {
+          "keywords": [],
+          "rules_triggered": [],
+          "semantic_score": 0.0
+        },
+        "evidence": [],
+        "next_actions": []
+      }
+    ],
+    "final_recommendation": {
+      "department_ids": [
+        "FIN_BUDG_INTERBUDG"
+      ],
+      "confidence": 0.0,
+      "comment": "Heuristic selection based on keyword scores."
+    },
+    "needs_human_review": true,
+    "review_reasons": []
+  },
+  "compliance": {
+    "sensitive_flags": [],
+    "safe_to_log_text": "yes",
+    "masking": {
+      "enabled": false,
+      "masked_fields": []
+    }
+  },
+  "diagnostics": {
+    "processing_time_ms": 7,
+    "model": {
+      "name": "heuristic-router",
+      "version": "dev"
+    },
+    "trace": {
+      "rules_version": "dev",
+      "catalog_version": "dev"
+    },
+    "errors": [],
+    "warnings": []
+  }
+}
