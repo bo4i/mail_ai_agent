@@ -9,17 +9,23 @@ OUT_OF_SCOPE_PENALTY = 2.0
 RULE_TRIGGERED_BOOST = 2.0
 HIGH_PRIORITY_EXTRA_BOOST = 2.0
 
-HIGH_PRECISION_MIN_COVERAGE = 0.66
-MEDIUM_PRECISION_MIN_COVERAGE = 0.4
+HIGH_PRECISION_MIN_COVERAGE = 1.0
+MEDIUM_PRECISION_MIN_COVERAGE = 0.66
 OUT_OF_SCOPE_MIN_COVERAGE = 0.5
 
 
 def _keyword_coverage(keyword: KeywordSpec, lemma_set: set[str]) -> float:
+    # 1. Проверка якорей
+    if keyword.anchors:
+        if not all(anchor in lemma_set for anchor in keyword.anchors):
+            return 0.0
+
+    # 2. Coverage по леммам
     if not keyword.lemmas:
         return 0.0
-    unique_lemmas = list(dict.fromkeys(keyword.lemmas))
-    matched = sum(1 for lemma in unique_lemmas if lemma in lemma_set)
-    return matched / len(unique_lemmas)
+
+    matched = sum(1 for lemma in keyword.lemmas if lemma in lemma_set)
+    return matched / len(keyword.lemmas)
 
 
 def _format_hit(keyword: KeywordSpec, coverage: float) -> str:
