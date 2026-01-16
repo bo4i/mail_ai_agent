@@ -30,15 +30,30 @@ STRUCTURAL_STOPWORDS = {
 }
 
 
-def _normalize_keywords(keywords: list[str]) -> list[KeywordSpec]:
-    specs: list[KeywordSpec] = []
-    for keyword in keywords:
-        tokens = tokenize(keyword)
+def _normalize_keywords(keywords: list[str | dict]) -> list[KeywordSpec]:
+    specs = []
+    for item in keywords:
+        if isinstance(item, str):
+            text = item
+            anchors = []
+        else:
+            text = item.get("text", "")
+            anchors = item.get("anchors", [])
+
+        tokens = tokenize(text)
         lemmas = lemmatize_tokens(tokens)
-        if not lemmas:
-            continue
-        lemma = lemmas[0] if len(lemmas) == 1 else None
-        specs.append(KeywordSpec(text=keyword, lemmas=lemmas, lemma=lemma))
+
+        anchor_lemmas = []
+        for anchor in anchors:
+            anchor_lemmas.extend(lemmatize_tokens(tokenize(anchor)))
+
+        specs.append(
+            KeywordSpec(
+                text=text,
+                lemmas=lemmas,
+                anchors=anchor_lemmas,
+            )
+        )
     return specs
 
 
