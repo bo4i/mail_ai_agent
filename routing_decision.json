@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.0",
+  "request_id": "uuid-or-any-id",
+  "created_at": "2026-01-15T12:34:56+01:00",
+
+  "input": {
+    "document_id": "optional-id",
+    "source_channel": "email|edms|manual_upload",
+    "file": {
+      "filename": "letter.pdf",
+      "sha256": "optional-hash",
+      "pages": 3
+    },
+    "metadata": {
+      "email_subject": "optional",
+      "sender": "optional",
+      "received_at": "optional-iso"
+    }
+  },
+
+  "extraction": {
+    "text_source": "native|ocr|mixed",
+    "language": "ru",
+    "page_map": [
+      {
+        "page": 1,
+        "text_span_id": "p1",
+        "char_start": 0,
+        "char_end": 1520
+      }
+    ],
+    "quality": {
+      "ocr_confidence": 0.0,
+      "has_tables": false,
+      "has_stamps_signatures": "unknown",
+      "warnings": [
+        "optional: low_text_density",
+        "optional: possible_bad_ocr"
+      ]
+    }
+  },
+
+  "understanding": {
+    "doc_type": "входящее письмо",
+    "summary": "Короткое резюме письма в 2–3 предложениях.",
+    "topics": [
+      "межбюджетные трансферты",
+      "проект местного бюджета"
+    ],
+    "urgency": {
+      "level": "low|normal|high",
+      "deadline_date": "optional-YYYY-MM-DD",
+      "signals": [
+        "optional: срочно",
+        "optional: в 3-дневный срок"
+      ]
+    },
+    "entities": {
+      "organizations": [
+        { "name": "ООО Ромашка", "role": "sender|mentioned" }
+      ],
+      "people": [
+        { "name": "Иванов И.И.", "role": "signatory|mentioned" }
+      ],
+      "numbers": {
+        "contract_numbers": ["optional"],
+        "invoice_numbers": ["optional"],
+        "letter_numbers": ["исх. № 12-34"],
+        "law_refs": ["Бюджетный кодекс РФ", "ст. 136 БК РФ"]
+      },
+      "dates": [
+        { "value": "2026-01-10", "label": "дата письма" }
+      ],
+      "amounts": [
+        { "value": 1250000, "currency": "RUB", "label": "сумма" }
+      ],
+      "locations": [
+        { "name": "Липецкая область", "role": "context" }
+      ]
+    }
+  },
+
+  "routing": {
+    "mode": "suggest_only|auto_route_allowed",
+    "suggestions": [
+      {
+        "department_id": "FIN_BUDG_INTERBUDG",
+        "department_name": "Отдел бюджетного планирования и межбюджетных отношений",
+        "confidence": 0.87,
+        "priority": "primary|coexecutor|cc",
+        "why": "Письмо касается распределения/уточнения межбюджетных трансфертов и/или заключения по проекту местного бюджета (входит в функции отдела).",
+        "matched_signals": {
+          "keywords": ["межбюджетные трансферты", "дотация", "проект местного бюджета"],
+          "rules_triggered": ["R-INTERBUDGET-01", "R-LOCALBUDGET-02"],
+          "semantic_score": 0.78
+        },
+        "evidence": [
+          {
+            "page": 1,
+            "quote": "Просим согласовать исходные данные для расчета распределения межбюджетных трансфертов...",
+            "char_start": 420,
+            "char_end": 505
+          },
+          {
+            "page": 2,
+            "quote": "Направляем проект местного бюджета на очередной финансовый год для подготовки заключения...",
+            "char_start": 120,
+            "char_end": 210
+          }
+        ],
+        "next_actions": [
+          "определить тип обращения: трансферты/заключение по бюджету/кредит",
+          "подготовить ответ/заключение в установленный срок",
+          "при необходимости запросить недостающие исходные данные у МО"
+        ],
+        "handoff": {
+          "queue": "optional-queue-id",
+          "assignee_role": "начальник отдела|исполнитель",
+          "sla_hours": 48
+        }
+      },
+      {
+        "department_id": "LEGAL",
+        "department_name": "Юридический отдел",
+        "confidence": 0.41,
+        "priority": "coexecutor",
+        "why": "В письме присутствуют претензионные формулировки/ссылки на правовые последствия — может потребоваться правовая оценка.",
+        "matched_signals": {
+          "keywords": ["претензия", "суд", "прокуратура"],
+          "rules_triggered": ["R-LEGAL-ESC-01"],
+          "semantic_score": 0.33
+        },
+        "evidence": [
+          {
+            "page": 1,
+            "quote": "В случае неполучения ответа будем вынуждены обратиться...",
+            "char_start": 880,
+            "char_end": 945
+          }
+        ],
+        "next_actions": [
+          "оценить юридические риски и корректность формулировок ответа"
+        ]
+      }
+    ],
+
+    "final_recommendation": {
+      "department_ids": ["FIN_BUDG_INTERBUDG"],
+      "confidence": 0.87,
+      "comment": "Основной исполнитель — бюджетное планирование и межбюджетные отношения; юристы — при наличии претензионной части."
+    },
+
+    "needs_human_review": false,
+    "review_reasons": [
+      "optional: low_confidence",
+      "optional: conflicting_rules",
+      "optional: missing_pages_or_bad_ocr",
+      "optional: sensitive_data"
+    ]
+  },
+
+  "compliance": {
+    "sensitive_flags": [
+      "state_secret_possible",
+      "personal_data_possible"
+    ],
+    "safe_to_log_text": "masked|no|yes",
+    "masking": {
+      "enabled": true,
+      "masked_fields": ["people", "amounts", "passport_numbers"]
+    }
+  },
+
+  "diagnostics": {
+    "processing_time_ms": 1234,
+    "model": {
+      "name": "optional",
+      "version": "optional"
+    },
+    "trace": {
+      "rules_version": "2026-01-15",
+      "catalog_version": "2026-01-15"
+    },
+    "errors": [],
+    "warnings": []
+  }
+}
