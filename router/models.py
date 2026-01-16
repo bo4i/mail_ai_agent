@@ -35,6 +35,14 @@ class Department:
     routing_keywords: dict[str, list[str]]
     triage_rules: list[dict[str, Any]]
     raw: dict[str, Any]
+    keyword_index: dict[str, list["KeywordSpec"]] = field(default_factory=dict)
+
+
+@dataclass
+class KeywordSpec:
+    text: str
+    lemmas: list[str]
+    lemma: str | None = None
 
 
 @dataclass

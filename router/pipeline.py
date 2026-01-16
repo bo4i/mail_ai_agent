@@ -13,7 +13,7 @@ if str(REPO_ROOT) not in sys.path:
 from pdf_extractor import extract_pdf
 from text_normalizer import normalize_texts
 
-from router.candidate_retrieval import retrieve_candidates
+from router.candidate_retrieval import apply_rules_boosts, retrieve_candidates
 from router.catalog_loader import load_departments_catalog
 from router.decision_builder import build_decision
 from router.input_adapter import normalized_letter_from_pages
@@ -48,8 +48,9 @@ def route_document(
         filename=pdf_path.name,
     )
     catalog = load_departments_catalog(catalog_path)
-    candidates = retrieve_candidates(letter.clean_text_for_llm, catalog)
     rules_context = apply_triage_rules(letter.clean_text_for_llm, catalog)
+    candidates = retrieve_candidates(letter.clean_text_for_llm, catalog)
+    candidates = apply_rules_boosts(candidates, rules_context)
     routing_decision = decide_routing(candidates, rules_context, mode=mode)
 
     processing_time_ms = int((time.perf_counter() - started) * 1000)
