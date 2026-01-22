@@ -101,7 +101,10 @@ def _ensure_list(data: Any) -> list[dict[str, Any]]:
 
 def load_departments_catalog(path: Path) -> DepartmentsCatalog:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    items = _ensure_list(payload)
+    if isinstance(payload, dict) and "departments" in payload:
+        items = _ensure_list(payload.get("departments"))
+    else:
+        items = _ensure_list(payload)
     department_ids: set[str] = set()
     departments: list[Department] = []
 
