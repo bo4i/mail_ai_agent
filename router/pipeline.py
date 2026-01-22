@@ -29,6 +29,11 @@ def route_document(
     schema_path: Path,
     output_path: Path | None = None,
     mode: str = "heuristic_only",
+    ollama_url: str = "http://localhost:11434",
+    ollama_model: str = "gpt-oss",
+    ollama_temperature: float = 0.2,
+    llm_topk: int = 5,
+    llm_force: bool = False,
 ) -> dict:
     started = time.perf_counter()
     pages = extract_pdf(pdf_path=pdf_path, min_text_chars=50, dpi=300, lang="rus+eng")
@@ -51,7 +56,18 @@ def route_document(
     rules_context = apply_triage_rules(letter.clean_text_for_llm, catalog)
     candidates = retrieve_candidates(letter.clean_text_for_llm, catalog)
     candidates = apply_rules_boosts(candidates, rules_context)
-    routing_decision = decide_routing(candidates, rules_context, mode=mode)
+    routing_decision = decide_routing(
+        candidates,
+        rules_context,
+        mode=mode,
+        letter_text=letter.clean_text_for_llm,
+        catalog=catalog,
+        ollama_url=ollama_url,
+        ollama_model=ollama_model,
+        ollama_temperature=ollama_temperature,
+        llm_top_k=llm_topk,
+        llm_force=llm_force,
+    )
 
     processing_time_ms = int((time.perf_counter() - started) * 1000)
     decision = build_decision(
@@ -93,6 +109,35 @@ def parse_args() -> argparse.Namespace:
         help="Routing mode",
     )
     parser.add_argument(
+        "--ollama-url",
+        type=str,
+        default="http://localhost:11434",
+        help="Ollama base URL (default: http://localhost:11434)",
+    )
+    parser.add_argument(
+        "--ollama-model",
+        type=str,
+        default="gpt-oss",
+        help="Ollama model name (default: gpt-oss)",
+    )
+    parser.add_argument(
+        "--ollama-temperature",
+        type=float,
+        default=0.2,
+        help="LLM temperature (default: 0.2)",
+    )
+    parser.add_argument(
+        "--llm-topk",
+        type=int,
+        default=5,
+        help="How many top heuristic candidates to pass into LLM (default: 5)",
+    )
+    parser.add_argument(
+        "--llm-force",
+        action="store_true",
+        help="Force LLM call even if heuristic confidence is high",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -109,6 +154,11 @@ def main() -> None:
         schema_path=args.schema,
         output_path=args.output,
         mode=args.mode,
+        ollama_url=args.ollama_url,
+        ollama_model=args.ollama_model,
+        ollama_temperature=args.ollama_temperature,
+        llm_topk=args.llm_topk,
+        llm_force=args.llm_force,
     )
 
 
