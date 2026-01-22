@@ -101,7 +101,10 @@ def _ensure_list(data: Any) -> list[dict[str, Any]]:
 
 def load_departments_catalog(path: Path) -> DepartmentsCatalog:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    items = _ensure_list(payload)
+    if isinstance(payload, dict) and "departments" in payload:
+        items = _ensure_list(payload.get("departments"))
+    else:
+        items = _ensure_list(payload)
     department_ids: set[str] = set()
     departments: list[Department] = []
 
@@ -125,8 +128,8 @@ def load_departments_catalog(path: Path) -> DepartmentsCatalog:
             for key, value in routing_keywords.items()
             if isinstance(value, list)
         }
-        out_of_scope = list(item.get("out_of_scope", []))
-        keyword_index = _build_keyword_index(routing_keywords, out_of_scope)
+        out_of_scope_keywords = routing_keywords.get("out_of_scope", [])
+        keyword_index = _build_keyword_index(routing_keywords, out_of_scope_keywords)
         existing_lemmas = {
             lemma
             for specs in keyword_index.values()
@@ -142,7 +145,7 @@ def load_departments_catalog(path: Path) -> DepartmentsCatalog:
             routing_keywords["structural_terms"] = list(structural_terms)
             keyword_index = _build_keyword_index(
                 routing_keywords,
-                out_of_scope,
+                out_of_scope_keywords,
                 structural_terms=structural_terms,
             )
 
