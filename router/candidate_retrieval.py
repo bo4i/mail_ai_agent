@@ -63,7 +63,7 @@ def _collect_out_of_scope(
     for keyword in keywords:
         coverage = _keyword_coverage(keyword, lemma_set)
         if coverage >= min_coverage:
-            penalty += OUT_OF_SCOPE_PENALTY
+            penalty += OUT_OF_SCOPE_PENALTY * coverage
             hits.append(_format_hit(keyword, coverage))
     return hits, penalty
 
