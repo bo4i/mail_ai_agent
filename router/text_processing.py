@@ -5,9 +5,15 @@ from dataclasses import dataclass
 import re
 from typing import Iterable
 
-from pymorphy3 import MorphAnalyzer
+from functools import lru_cache
 
-_MORPH = MorphAnalyzer()
+try:
+    from pymorphy3 import MorphAnalyzer
+except ImportError:
+    try:
+        from pymorphy2 import MorphAnalyzer
+    except ImportError:
+        MorphAnalyzer = None
 
 _TOKEN_SPLIT_RE = re.compile(r"[^\wа-яё]+", re.IGNORECASE)
 _HAS_LETTER_RE = re.compile(r"[a-zа-яё]", re.IGNORECASE)
@@ -37,8 +43,21 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
+@lru_cache(maxsize=1)
+def _get_morph() -> MorphAnalyzer | None:
+    if MorphAnalyzer is None:
+        return None
+    try:
+        return MorphAnalyzer()
+    except Exception:
+        return None
+
+
 def lemmatize_tokens(tokens: Iterable[str]) -> list[str]:
-    return [_MORPH.parse(token)[0].normal_form for token in tokens]
+    morph = _get_morph()
+    if not morph:
+        return list(tokens)
+    return [morph.parse(token)[0].normal_form for token in tokens]
 
 
 def normalize_text(text: str) -> NormalizedText:

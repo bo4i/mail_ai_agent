@@ -60,13 +60,10 @@ def _normalize_keywords(keywords: list[str | dict]) -> list[KeywordSpec]:
 def _build_keyword_index(
     routing_keywords: dict[str, list[str]],
     out_of_scope: list[str],
-    *,
-    structural_terms: list[str] | None = None,
 ) -> dict[str, list[KeywordSpec]]:
     return {
         "high_precision": _normalize_keywords(routing_keywords.get("high_precision", [])),
         "medium_precision": _normalize_keywords(routing_keywords.get("medium_precision", [])),
-        "structural_terms": _normalize_keywords(structural_terms or []),
         "out_of_scope": _normalize_keywords(out_of_scope),
     }
 
@@ -139,12 +136,8 @@ def load_departments_catalog(path: Path) -> DepartmentsCatalog:
             max_terms=MAX_STRUCTURAL_TERMS,
         )
         if structural_terms:
-            routing_keywords["structural_terms"] = list(structural_terms)
-            keyword_index = _build_keyword_index(
-                routing_keywords,
-                out_of_scope,
-                structural_terms=structural_terms,
-            )
+            routing_keywords.setdefault("medium_precision", []).extend(structural_terms)
+            keyword_index = _build_keyword_index(routing_keywords, out_of_scope)
 
         departments.append(
             Department(

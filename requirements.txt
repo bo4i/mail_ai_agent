@@ -5,4 +5,3 @@ opencv-python
 numpy
 jsonschema
 pymorphy3
-setuptools

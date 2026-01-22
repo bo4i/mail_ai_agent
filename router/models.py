@@ -56,7 +56,6 @@ class CandidateDepartment:
     department_name: str
     keyword_hits: dict[str, list[str]]
     score: float
-    score_breakdown: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
