@@ -1,22 +1,35 @@
 from __future__ import annotations
 
-from router.models import DepartmentsCatalog, RulesContext
-from router.text_processing import normalize_text
+from typing import Any
 
-PRIMARY_ANCHORS = {"суд", "прокуратура", "иск"}
-SECONDARY_ANCHORS = {"жалоба", "проверка", "представление", "исковой"}
+from router.candidate_retrieval import _keyword_coverage
+from router.models import DepartmentsCatalog, KeywordSpec, RulesContext
+from router.text_processing import lemmatize_tokens, normalize_text, tokenize
+
+TRIAGE_MIN_COVERAGE = 0.5
 
 
-def _matches_rule(lemma_set: set[str], triggers: list[str]) -> bool:
-    trigger_lemmas = {lemma for trigger in triggers for lemma in normalize_text(trigger).lemma_list}
-    if not trigger_lemmas:
-        return False
-    if PRIMARY_ANCHORS.intersection(trigger_lemmas):
-        if not PRIMARY_ANCHORS.intersection(lemma_set):
-            return False
-        if not SECONDARY_ANCHORS.intersection(lemma_set):
-            return False
-    return bool(trigger_lemmas.intersection(lemma_set))
+def _normalize_triggers(triggers: list[str | dict[str, Any]]) -> list[KeywordSpec]:
+    specs: list[KeywordSpec] = []
+    for item in triggers:
+        if isinstance(item, str):
+            text = item
+            anchors: list[str] = []
+        else:
+            text = str(item.get("text", ""))
+            anchors = list(item.get("anchors", []))
+        tokens = tokenize(text)
+        lemmas = lemmatize_tokens(tokens)
+        anchor_lemmas: list[str] = []
+        for anchor in anchors:
+            anchor_lemmas.extend(lemmatize_tokens(tokenize(str(anchor))))
+        specs.append(KeywordSpec(text=text, lemmas=lemmas, anchors=anchor_lemmas))
+    return specs
+
+
+def _matches_rule(lemma_set: set[str], triggers: list[str | dict[str, Any]]) -> bool:
+    specs = _normalize_triggers(triggers)
+    return any(_keyword_coverage(spec, lemma_set) >= TRIAGE_MIN_COVERAGE for spec in specs)
 
 
 def _extract_review_reason(rule_text: str) -> str | None:
