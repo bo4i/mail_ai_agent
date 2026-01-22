@@ -5,6 +5,7 @@ from router.text_processing import normalize_text
 
 HIGH_PRECISION_WEIGHT = 3.0
 MEDIUM_PRECISION_WEIGHT = 1.0
+STRUCTURAL_TERM_WEIGHT = 0.2
 OUT_OF_SCOPE_PENALTY = 2.0
 RULE_TRIGGERED_BOOST = 2.0
 HIGH_PRIORITY_EXTRA_BOOST = 2.0
@@ -88,12 +89,18 @@ def retrieve_candidates(
             min_coverage=MEDIUM_PRECISION_MIN_COVERAGE,
             weight=MEDIUM_PRECISION_WEIGHT,
         )
+        structural_hits, structural_score = _collect_hits(
+            keyword_index.get("structural_terms", []),
+            lemma_set,
+            min_coverage=MEDIUM_PRECISION_MIN_COVERAGE,
+            weight=STRUCTURAL_TERM_WEIGHT,
+        )
         out_of_scope_hits, out_penalty = _collect_out_of_scope(
             keyword_index.get("out_of_scope", []),
             lemma_set,
             min_coverage=OUT_OF_SCOPE_MIN_COVERAGE,
         )
-        score = high_score + medium_score - out_penalty
+        score = high_score + medium_score + structural_score - out_penalty
 
         candidates.append(
             CandidateDepartment(
@@ -102,9 +109,16 @@ def retrieve_candidates(
                 keyword_hits={
                     "high_precision": high_hits,
                     "medium_precision": medium_hits,
+                    "structural_terms": structural_hits,
                     "out_of_scope": out_of_scope_hits,
                 },
                 score=score,
+                score_breakdown={
+                    "high_precision": high_score,
+                    "medium_precision": medium_score,
+                    "structural_terms": structural_score,
+                    "out_of_scope_penalty": out_penalty,
+                },
             )
         )
 
@@ -130,6 +144,7 @@ def apply_rules_boosts(
                 department_name=candidate.department_name,
                 keyword_hits=candidate.keyword_hits,
                 score=score,
+                score_breakdown=dict(candidate.score_breakdown),
             )
         )
     return sorted(boosted, key=lambda item: item.score, reverse=True)
