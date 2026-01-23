@@ -39,14 +39,30 @@ def _matches_rule(
     specs = _normalize_triggers(triggers)
     for spec in specs:
         if len(spec.lemmas) == 1:
-            if not spec.anchors:
-                continue
             min_coverage = TRIAGE_SINGLE_WORD_MIN_COVERAGE
         else:
             min_coverage = TRIAGE_MIN_COVERAGE
         if _keyword_coverage(spec, lemma_set, lemma_list) >= min_coverage:
             return True
     return False
+
+
+def _matches_all(
+    lemma_set: set[str],
+    lemma_list: list[str],
+    triggers: list[str | dict[str, Any]],
+) -> bool:
+    specs = _normalize_triggers(triggers)
+    if not specs:
+        return False
+    for spec in specs:
+        if len(spec.lemmas) == 1:
+            min_coverage = TRIAGE_SINGLE_WORD_MIN_COVERAGE
+        else:
+            min_coverage = TRIAGE_MIN_COVERAGE
+        if _keyword_coverage(spec, lemma_set, lemma_list) < min_coverage:
+            return False
+    return True
 
 
 def _extract_review_reason(rule_text: str) -> str | None:
@@ -56,7 +72,9 @@ def _extract_review_reason(rule_text: str) -> str | None:
     return None
 
 
-def _priority_boost(rule_text: str) -> int:
+def _priority_boost(rule_text: str, priority: str | None = None) -> int:
+    if priority and priority.lower() == "high":
+        return 2
     lowered = rule_text.lower()
     if "высок" in lowered and "приоритет" in lowered:
         return 2
@@ -76,15 +94,22 @@ def apply_triage_rules(clean_text_for_llm: str, catalog: DepartmentsCatalog) -> 
         triggered_rules: list[str] = []
 
         for rule in department.triage_rules:
-            triggers = rule.get("if_any", [])
-            if not triggers:
+            triggers_any = rule.get("any") or rule.get("if_any") or []
+            triggers_all = rule.get("all") or []
+            if not triggers_any and not triggers_all:
                 continue
 
-            if _matches_rule(lemma_set, lemma_list, triggers):
+            matched_any = bool(triggers_any) and _matches_rule(
+                lemma_set, lemma_list, list(triggers_any)
+            )
+            matched_all = bool(triggers_all) and _matches_all(
+                lemma_set, lemma_list, list(triggers_all)
+            )
+            if matched_any or matched_all:
                 rule_text = str(rule.get("then", "rule matched"))
                 triggered_rules.append(rule_text)
 
-                boost = _priority_boost(rule_text)
+                boost = _priority_boost(rule_text, rule.get("priority"))
                 if boost:
                     priority_boosts[department.department_id] = priority_boosts.get(
                         department.department_id, 0

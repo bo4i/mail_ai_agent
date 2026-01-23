@@ -8,6 +8,7 @@ MEDIUM_PRECISION_WEIGHT = 1.0
 STRUCTURAL_WEIGHT = 0.5
 
 OUT_OF_SCOPE_PENALTY = 2.0
+NEGATIVE_CONTEXT_PENALTY = 1.0
 RULE_TRIGGERED_BOOST = 2.0
 HIGH_PRIORITY_EXTRA_BOOST = 2.0
 
@@ -16,7 +17,10 @@ HIGH_PRECISION_MIN_COVERAGE = 0.66
 MEDIUM_PRECISION_MIN_COVERAGE = 0.66
 STRUCTURAL_MIN_COVERAGE = 1.0  # структурные термины обычно одиночные леммы
 OUT_OF_SCOPE_MIN_COVERAGE = 0.5
+NEGATIVE_CONTEXT_MIN_COVERAGE = 1.0
 PROXIMITY_WINDOW = 7
+NEGATIVE_CONTEXT_MIN_MATCHES = 2
+NEGATIVE_CONTEXT_DEPARTMENT_IDS = {"FIN_CIVIL_SERVICE_ADMIN"}
 
 
 def _anchors_in_proximity(
@@ -102,6 +106,21 @@ def _collect_out_of_scope(
     return hits, penalty
 
 
+def _collect_negative_context(
+    keywords: list[KeywordSpec],
+    lemma_set: set[str],
+    lemma_list: list[str],
+    *,
+    min_coverage: float,
+) -> list[str]:
+    hits: list[str] = []
+    for keyword in keywords:
+        coverage = _keyword_coverage(keyword, lemma_set, lemma_list)
+        if coverage >= min_coverage:
+            hits.append(_format_hit(keyword, coverage))
+    return hits
+
+
 def retrieve_candidates(clean_text_for_llm: str, catalog: DepartmentsCatalog) -> list[CandidateDepartment]:
     normalized = normalize_text(clean_text_for_llm)
     lemma_set = normalized.lemma_set
@@ -138,8 +157,19 @@ def retrieve_candidates(clean_text_for_llm: str, catalog: DepartmentsCatalog) ->
             lemma_list,
             min_coverage=OUT_OF_SCOPE_MIN_COVERAGE,
         )
+        negative_hits: list[str] = []
+        negative_penalty = 0.0
+        if department.department_id in NEGATIVE_CONTEXT_DEPARTMENT_IDS:
+            negative_hits = _collect_negative_context(
+                keyword_index.get("negative_context", []),
+                lemma_set,
+                lemma_list,
+                min_coverage=NEGATIVE_CONTEXT_MIN_COVERAGE,
+            )
+            if not high_hits and len(negative_hits) >= NEGATIVE_CONTEXT_MIN_MATCHES:
+                negative_penalty = NEGATIVE_CONTEXT_PENALTY * len(negative_hits)
 
-        score = high_score + medium_score + structural_score - out_penalty
+        score = high_score + medium_score + structural_score - out_penalty - negative_penalty
         candidates.append(
             CandidateDepartment(
                 department_id=department.department_id,
@@ -149,6 +179,7 @@ def retrieve_candidates(clean_text_for_llm: str, catalog: DepartmentsCatalog) ->
                     "medium_precision": medium_hits,
                     "structural_terms": structural_hits,
                     "out_of_scope": out_of_scope_hits,
+                    "negative_context": negative_hits,
                 },
                 score=score,
                 score_breakdown={
@@ -156,6 +187,7 @@ def retrieve_candidates(clean_text_for_llm: str, catalog: DepartmentsCatalog) ->
                     "medium_precision": medium_score,
                     "structural_terms": structural_score,
                     "out_of_scope_penalty": out_penalty,
+                    "negative_context_penalty": negative_penalty,
                 },
             )
         )

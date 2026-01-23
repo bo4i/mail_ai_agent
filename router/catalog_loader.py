@@ -62,6 +62,7 @@ def _build_keyword_index(
         "high_precision": _normalize_keywords(list(routing_keywords.get("high_precision", []))),
         "medium_precision": _normalize_keywords(list(routing_keywords.get("medium_precision", []))),
         "structural_terms": _normalize_keywords(list(structural_terms or [])),
+        "negative_context": _normalize_keywords(list(routing_keywords.get("negative_context", []))),
         "out_of_scope": _normalize_keywords(list(out_of_scope_keywords or [])),
     }
 

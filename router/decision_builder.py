@@ -11,6 +11,8 @@ from router.models import (
     RulesContext,
 )
 
+BUDGET_DOMINANT_PREFIXES = ("FIN_BUDG", "FIN_TREASURY", "FIN_PROCUREMENT", "FIN_REVENUE")
+
 def _clip01(value) -> float:
     try:
         v = float(value)
@@ -94,6 +96,18 @@ def _build_suggestions(
     return suggestions
 
 
+def _has_budget_dominant_high_precision(
+    candidates: list[CandidateDepartment],
+    top_candidate: CandidateDepartment,
+) -> bool:
+    top_score = max(top_candidate.score, 0.0)
+    for candidate in candidates:
+        if candidate.department_id.startswith(BUDGET_DOMINANT_PREFIXES):
+            if candidate.keyword_hits.get("high_precision") and candidate.score >= top_score * 0.9:
+                return True
+    return False
+
+
 def build_decision(
     letter: NormalizedLetter,
     catalog: DepartmentsCatalog,
@@ -106,6 +120,7 @@ def build_decision(
     text_source = _derive_text_source(letter)
     max_score = max((candidate.score for candidate in candidates), default=0.0)
     summary = _ensure_summary(letter)
+    top_candidate = candidates[0] if candidates else None
     organization_entities: list[dict[str, str]] = []
     if letter.issuer:
         organization_entities.append({"name": letter.issuer, "role": "sender"})
@@ -115,6 +130,20 @@ def build_decision(
     review_reasons = list(rules_context.review_reasons)
     if routing_decision.fallback_reason:
         review_reasons.append(routing_decision.fallback_reason)
+
+    auto_route_allowed = True
+    if top_candidate:
+        high_hits = top_candidate.keyword_hits.get("high_precision", [])
+        medium_hits = top_candidate.keyword_hits.get("medium_precision", [])
+        triage_high = rules_context.priority_boosts.get(top_candidate.department_id, 0) > 0
+        auto_route_allowed = bool(high_hits) or (triage_high and bool(medium_hits))
+        if _has_budget_dominant_high_precision(candidates, top_candidate):
+            auto_route_allowed = False
+            review_reasons.append("AUTO_ROUTE_ALLOWED=false: доминируют бюджетные high_precision сигналы.")
+        if not auto_route_allowed:
+            review_reasons.append(
+                "AUTO_ROUTE_ALLOWED=false: недостаточно high_precision или триаж+medium для автопроводки."
+            )
 
     decision = {
         "schema_version": "1.0",
@@ -161,14 +190,16 @@ def build_decision(
             },
         },
         "routing": {
-            "mode": "auto_route_allowed",
+            "mode": "auto_route_allowed" if auto_route_allowed else "suggest_only",
             "suggestions": _build_suggestions(candidates, rules_context, max_score),
             "final_recommendation": {
                 "department_ids": routing_decision.department_ids or [candidates[0].department_id],
                 "confidence": _clip01(routing_decision.confidence),
                 "comment": routing_decision.comment,
             },
-            "needs_human_review": bool(review_reasons) or _clip01(routing_decision.confidence) < 0.4,
+            "needs_human_review": bool(review_reasons)
+            or _clip01(routing_decision.confidence) < 0.4
+            or not auto_route_allowed,
             "review_reasons": review_reasons,
         },
         "compliance": {
