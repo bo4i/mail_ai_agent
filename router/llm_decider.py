@@ -5,7 +5,7 @@ import math
 from typing import Any
 
 from router.models import CandidateDepartment, DepartmentsCatalog, RoutingDecision, RulesContext
-from router.ollama_client import OllamaClient, OllamaConfig
+from router.ollama_client import OllamaClient, OllamaConfig, OllamaError
 
 MIN_SCORE_THRESHOLD = 1.0
 LOW_SCORE_CONFIDENCE = 0.2
@@ -323,7 +323,18 @@ def decide_routing(
         )
     )
 
-    raw = client.chat(system=system, user=user_text)
+    try:
+        raw = client.chat(system=system, user=user_text)
+    except OllamaError as exc:
+        return RoutingDecision(
+            department_ids=[top_candidate.department_id],
+            confidence=confidence,
+            mode=mode,
+            comment="LLM-assisted mode: Ollama timeout or error; used heuristic fallback."
+            + low_score_note,
+            used_llm=False,
+            fallback_reason="llm_unavailable",
+        )
 
     for _ in range(3):
         candidate_json = _extract_json_object(raw)
@@ -370,16 +381,27 @@ def decide_routing(
         else:
             err_text = "No JSON object found in model output"
 
-        raw = client.chat(
-            system=system,
-            user=(
-                "Исправь ответ. Нужен СТРОГО валидный JSON по схеме из запроса.\n"
-                f"Ошибка: {err_text}\n"
-                "Верни только JSON, без текста.\n"
-                "Твой предыдущий ответ:\n"
-                + raw
-            ),
-        )
+        try:
+            raw = client.chat(
+                system=system,
+                user=(
+                    "Исправь ответ. Нужен СТРОГО валидный JSON по схеме из запроса.\n"
+                    f"Ошибка: {err_text}\n"
+                    "Верни только JSON, без текста.\n"
+                    "Твой предыдущий ответ:\n"
+                    + raw
+                ),
+            )
+        except OllamaError:
+            return RoutingDecision(
+                department_ids=[top_candidate.department_id],
+                confidence=confidence,
+                mode=mode,
+                comment="LLM-assisted mode: Ollama timeout or error; used heuristic fallback."
+                + low_score_note,
+                used_llm=False,
+                fallback_reason="llm_unavailable",
+            )
 
     return RoutingDecision(
         department_ids=[top_candidate.department_id],
