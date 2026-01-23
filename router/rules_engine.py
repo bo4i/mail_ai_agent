@@ -18,11 +18,14 @@ def _normalize_triggers(triggers: list[str | dict[str, Any]]) -> list[KeywordSpe
         else:
             text = str(item.get("text", ""))
             anchors = list(item.get("anchors", []))
+
         tokens = tokenize(text)
         lemmas = lemmatize_tokens(tokens)
+
         anchor_lemmas: list[str] = []
         for anchor in anchors:
             anchor_lemmas.extend(lemmatize_tokens(tokenize(str(anchor))))
+
         specs.append(KeywordSpec(text=text, lemmas=lemmas, anchors=anchor_lemmas))
     return specs
 
@@ -52,20 +55,25 @@ def apply_triage_rules(clean_text_for_llm: str, catalog: DepartmentsCatalog) -> 
     review_reasons: list[str] = []
 
     lemma_set = normalize_text(clean_text_for_llm).lemma_set
+
     for department in catalog.departments:
         triggered_rules: list[str] = []
+
         for rule in department.triage_rules:
             triggers = rule.get("if_any", [])
             if not triggers:
                 continue
+
             if _matches_rule(lemma_set, triggers):
                 rule_text = str(rule.get("then", "rule matched"))
                 triggered_rules.append(rule_text)
+
                 boost = _priority_boost(rule_text)
                 if boost:
-                    priority_boosts[department.department_id] = (
-                        priority_boosts.get(department.department_id, 0) + boost
-                    )
+                    priority_boosts[department.department_id] = priority_boosts.get(
+                        department.department_id, 0
+                    ) + boost
+
                 review_reason = _extract_review_reason(rule_text)
                 if review_reason and review_reason not in review_reasons:
                     review_reasons.append(review_reason)

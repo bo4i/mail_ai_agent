@@ -16,8 +16,7 @@ def _iso_now() -> str:
 
 def load_raw_pages(payload: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not isinstance(payload, list):
-        msg = "Expected payload to be a list of pages from 1.json"
-        raise ValueError(msg)
+        raise ValueError("Expected payload to be a list of pages from 1.json")
     return payload
 
 
@@ -43,7 +42,7 @@ def normalized_letter_from_pages(
     pages: list[NormalizedPage] = []
 
     for item in pages_payload:
-        normalized = item.get("normalized", {})
+        normalized = item.get("normalized", {}) or {}
         subject = normalized.get("subject")
         issuer = normalized.get("issuer")
         addressee = normalized.get("addressee")
@@ -53,19 +52,23 @@ def normalized_letter_from_pages(
             issuers.append(issuer)
         if addressee:
             addressees.append(addressee)
+
         for topic in normalized.get("topics", []) or []:
             if topic not in topics:
                 topics.append(topic)
         for attachment in normalized.get("attachments", []) or []:
             if attachment not in attachments:
                 attachments.append(attachment)
-        page_text = normalized.get("clean_text_for_llm", "")
+
+        page_text = normalized.get("clean_text_for_llm", "") or ""
         if page_text:
             clean_text_blocks.append(page_text)
-        confidence_flags = normalized.get("confidence_flags", {})
+
+        confidence_flags = normalized.get("confidence_flags", {}) or {}
         if "ocr_used" not in confidence_flags:
             confidence_flags = dict(confidence_flags)
             confidence_flags["ocr_used"] = item.get("source") == "ocr"
+
         pages.append(
             NormalizedPage(
                 page=int(item.get("page") or 0),

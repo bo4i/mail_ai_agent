@@ -29,20 +29,21 @@ class NormalizedLetter:
 
 
 @dataclass
-class Department:
-    department_id: str
-    department_name: str
-    routing_keywords: dict[str, list[str]]
-    triage_rules: list[dict[str, Any]]
-    raw: dict[str, Any]
-    keyword_index: dict[str, list["KeywordSpec"]] = field(default_factory=dict)
-
-
-@dataclass
 class KeywordSpec:
     text: str
     lemmas: list[str]
     anchors: list[str]
+
+
+@dataclass
+class Department:
+    department_id: str
+    department_name: str
+    routing_keywords: dict[str, list[Any]]
+    triage_rules: list[dict[str, Any]]
+    raw: dict[str, Any]
+    keyword_index: dict[str, list[KeywordSpec]] = field(default_factory=dict)
+
 
 @dataclass
 class DepartmentsCatalog:
