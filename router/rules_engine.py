@@ -7,6 +7,7 @@ from router.models import DepartmentsCatalog, KeywordSpec, RulesContext
 from router.text_processing import lemmatize_tokens, normalize_text, tokenize
 
 TRIAGE_MIN_COVERAGE = 0.5
+TRIAGE_SINGLE_WORD_MIN_COVERAGE = 1.0
 
 
 def _normalize_triggers(triggers: list[str | dict[str, Any]]) -> list[KeywordSpec]:
@@ -30,9 +31,22 @@ def _normalize_triggers(triggers: list[str | dict[str, Any]]) -> list[KeywordSpe
     return specs
 
 
-def _matches_rule(lemma_set: set[str], triggers: list[str | dict[str, Any]]) -> bool:
+def _matches_rule(
+    lemma_set: set[str],
+    lemma_list: list[str],
+    triggers: list[str | dict[str, Any]],
+) -> bool:
     specs = _normalize_triggers(triggers)
-    return any(_keyword_coverage(spec, lemma_set) >= TRIAGE_MIN_COVERAGE for spec in specs)
+    for spec in specs:
+        if len(spec.lemmas) == 1:
+            if not spec.anchors:
+                continue
+            min_coverage = TRIAGE_SINGLE_WORD_MIN_COVERAGE
+        else:
+            min_coverage = TRIAGE_MIN_COVERAGE
+        if _keyword_coverage(spec, lemma_set, lemma_list) >= min_coverage:
+            return True
+    return False
 
 
 def _extract_review_reason(rule_text: str) -> str | None:
@@ -54,7 +68,9 @@ def apply_triage_rules(clean_text_for_llm: str, catalog: DepartmentsCatalog) -> 
     priority_boosts: dict[str, int] = {}
     review_reasons: list[str] = []
 
-    lemma_set = normalize_text(clean_text_for_llm).lemma_set
+    normalized = normalize_text(clean_text_for_llm)
+    lemma_set = normalized.lemma_set
+    lemma_list = normalized.lemma_list
 
     for department in catalog.departments:
         triggered_rules: list[str] = []
@@ -64,7 +80,7 @@ def apply_triage_rules(clean_text_for_llm: str, catalog: DepartmentsCatalog) -> 
             if not triggers:
                 continue
 
-            if _matches_rule(lemma_set, triggers):
+            if _matches_rule(lemma_set, lemma_list, triggers):
                 rule_text = str(rule.get("then", "rule matched"))
                 triggered_rules.append(rule_text)
 

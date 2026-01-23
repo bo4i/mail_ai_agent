@@ -16,12 +16,42 @@ HIGH_PRECISION_MIN_COVERAGE = 0.66
 MEDIUM_PRECISION_MIN_COVERAGE = 0.66
 STRUCTURAL_MIN_COVERAGE = 1.0  # структурные термины обычно одиночные леммы
 OUT_OF_SCOPE_MIN_COVERAGE = 0.5
+PROXIMITY_WINDOW = 7
 
 
-def _keyword_coverage(keyword: KeywordSpec, lemma_set: set[str]) -> float:
+def _anchors_in_proximity(
+    keyword_lemma: str,
+    anchors: list[str],
+    lemma_list: list[str],
+    *,
+    window: int,
+) -> bool:
+    if not anchors or not lemma_list:
+        return False
+    anchor_set = set(anchors)
+    for idx, lemma in enumerate(lemma_list):
+        if lemma != keyword_lemma:
+            continue
+        start = max(0, idx - window)
+        end = min(len(lemma_list), idx + window + 1)
+        if any(anchor in anchor_set for anchor in lemma_list[start:end]):
+            return True
+    return False
+
+
+def _keyword_coverage(
+    keyword: KeywordSpec,
+    lemma_set: set[str],
+    lemma_list: list[str] | None = None,
+) -> float:
     # 1) Проверка якорей
     if keyword.anchors:
-        if not all(anchor in lemma_set for anchor in keyword.anchors):
+        if lemma_list and len(keyword.lemmas) == 1:
+            if not _anchors_in_proximity(
+                keyword.lemmas[0], keyword.anchors, lemma_list, window=PROXIMITY_WINDOW
+            ):
+                return 0.0
+        elif not all(anchor in lemma_set for anchor in keyword.anchors):
             return 0.0
 
     # 2) Coverage по леммам
@@ -40,6 +70,7 @@ def _format_hit(keyword: KeywordSpec, coverage: float) -> str:
 def _collect_hits(
     keywords: list[KeywordSpec],
     lemma_set: set[str],
+    lemma_list: list[str],
     *,
     min_coverage: float,
     weight: float,
@@ -47,7 +78,7 @@ def _collect_hits(
     hits: list[str] = []
     score = 0.0
     for keyword in keywords:
-        coverage = _keyword_coverage(keyword, lemma_set)
+        coverage = _keyword_coverage(keyword, lemma_set, lemma_list)
         if coverage >= min_coverage:
             score += weight * coverage
             hits.append(_format_hit(keyword, coverage))
@@ -57,13 +88,14 @@ def _collect_hits(
 def _collect_out_of_scope(
     keywords: list[KeywordSpec],
     lemma_set: set[str],
+    lemma_list: list[str],
     *,
     min_coverage: float,
 ) -> tuple[list[str], float]:
     hits: list[str] = []
     penalty = 0.0
     for keyword in keywords:
-        coverage = _keyword_coverage(keyword, lemma_set)
+        coverage = _keyword_coverage(keyword, lemma_set, lemma_list)
         if coverage >= min_coverage:
             penalty += OUT_OF_SCOPE_PENALTY * coverage
             hits.append(_format_hit(keyword, coverage))
@@ -73,6 +105,7 @@ def _collect_out_of_scope(
 def retrieve_candidates(clean_text_for_llm: str, catalog: DepartmentsCatalog) -> list[CandidateDepartment]:
     normalized = normalize_text(clean_text_for_llm)
     lemma_set = normalized.lemma_set
+    lemma_list = normalized.lemma_list
 
     candidates: list[CandidateDepartment] = []
     for department in catalog.departments:
@@ -81,24 +114,28 @@ def retrieve_candidates(clean_text_for_llm: str, catalog: DepartmentsCatalog) ->
         high_hits, high_score = _collect_hits(
             keyword_index.get("high_precision", []),
             lemma_set,
+            lemma_list,
             min_coverage=HIGH_PRECISION_MIN_COVERAGE,
             weight=HIGH_PRECISION_WEIGHT,
         )
         medium_hits, medium_score = _collect_hits(
             keyword_index.get("medium_precision", []),
             lemma_set,
+            lemma_list,
             min_coverage=MEDIUM_PRECISION_MIN_COVERAGE,
             weight=MEDIUM_PRECISION_WEIGHT,
         )
         structural_hits, structural_score = _collect_hits(
             keyword_index.get("structural_terms", []),
             lemma_set,
+            lemma_list,
             min_coverage=STRUCTURAL_MIN_COVERAGE,
             weight=STRUCTURAL_WEIGHT,
         )
         out_of_scope_hits, out_penalty = _collect_out_of_scope(
             keyword_index.get("out_of_scope", []),
             lemma_set,
+            lemma_list,
             min_coverage=OUT_OF_SCOPE_MIN_COVERAGE,
         )
 
