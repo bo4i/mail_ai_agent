@@ -83,6 +83,9 @@ def route_document(
     if output_path is None:
         output_path = pdf_path.with_suffix(".routing_decision.json")
     output_path.write_text(json.dumps(decision, ensure_ascii=False, indent=2), encoding="utf-8")
+    short_output_path = output_path.with_name(f"{output_path.stem}.short.txt")
+    short_comment = decision.get("routing", {}).get("final_recommendation", {}).get("comment", "")
+    short_output_path.write_text(short_comment or "", encoding="utf-8")
     return decision
 
 
