@@ -84,8 +84,26 @@ def route_document(
         output_path = pdf_path.with_suffix(".routing_decision.json")
     output_path.write_text(json.dumps(decision, ensure_ascii=False, indent=2), encoding="utf-8")
     short_output_path = output_path.with_name(f"{output_path.stem}.short.txt")
-    short_comment = decision.get("routing", {}).get("final_recommendation", {}).get("comment", "")
-    short_output_path.write_text(short_comment or "", encoding="utf-8")
+    routing = decision.get("routing", {})
+    final_recommendation = routing.get("final_recommendation", {})
+    department_ids = list(final_recommendation.get("department_ids", []))
+    department_lookup = {dept.department_id: dept.department_name for dept in catalog.departments}
+    department_names = [department_lookup.get(dept_id, dept_id) for dept_id in department_ids]
+    confidence = final_recommendation.get("confidence")
+    comment = final_recommendation.get("comment", "")
+    needs_review = routing.get("needs_human_review", False)
+    review_reasons = routing.get("review_reasons", [])
+
+    short_lines = [
+        f"department_ids: {', '.join(department_ids)}",
+        f"department_names: {', '.join(department_names)}",
+        f"convidence: {confidence}",
+        f"comment: {comment}",
+        f"needs_human_review: {needs_review}",
+    ]
+    if needs_review:
+        short_lines.append(f"review_reasons: {', '.join(review_reasons)}")
+    short_output_path.write_text("\n".join(short_lines).strip() + "\n", encoding="utf-8")
     return decision
 
 
