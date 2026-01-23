@@ -11,6 +11,15 @@ from router.models import (
     RulesContext,
 )
 
+def _clip01(value) -> float:
+    try:
+        v = float(value)
+    except Exception:
+        return 0.0
+    if v != v:  # NaN
+        return 0.0
+    return max(0.0, min(1.0, v))
+
 
 def _derive_text_source(letter: NormalizedLetter) -> str:
     ocr_pages = [page for page in letter.pages if page.confidence_flags.get("ocr_used")]
@@ -54,7 +63,8 @@ def _build_suggestions(
 ) -> list[dict[str, Any]]:
     suggestions: list[dict[str, Any]] = []
     for candidate in candidates:
-        confidence = 0.0 if max_score <= 0 else min(1.0, candidate.score / max_score)
+        raw_conf = 0.0 if max_score <= 0 else (candidate.score / max_score)
+        confidence = _clip01(raw_conf)
         rules_triggered = rules_context.rules_triggered.get(candidate.department_id, [])
         keywords = (
             candidate.keyword_hits.get("high_precision", [])
@@ -155,10 +165,10 @@ def build_decision(
             "suggestions": _build_suggestions(candidates, rules_context, max_score),
             "final_recommendation": {
                 "department_ids": routing_decision.department_ids or [candidates[0].department_id],
-                "confidence": routing_decision.confidence,
+                "confidence": _clip01(routing_decision.confidence),
                 "comment": routing_decision.comment,
             },
-            "needs_human_review": bool(review_reasons) or routing_decision.confidence < 0.4,
+            "needs_human_review": bool(review_reasons) or _clip01(routing_decision.confidence) < 0.4,
             "review_reasons": review_reasons,
         },
         "compliance": {
