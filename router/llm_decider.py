@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
 from router.models import CandidateDepartment, DepartmentsCatalog, RoutingDecision, RulesContext
@@ -9,6 +10,7 @@ from router.ollama_client import OllamaClient, OllamaConfig
 MIN_SCORE_THRESHOLD = 1.0
 LOW_SCORE_CONFIDENCE = 0.2
 HIGH_PRECISION_CONFIDENCE_CAP = 0.6
+TRIAGE_CONFIDENCE_CAP = 0.55
 MEDIUM_DOMINANCE_THRESHOLD = 0.6
 MEDIUM_DOMINANCE_PENALTY = 0.7
 
@@ -18,6 +20,10 @@ def _gap_confidence(top_score: float, second_score: float) -> float:
         return 0.0
     gap = top_score - second_score
     return max(0.0, min(1.0, gap / max(top_score, 1e-6)))
+
+
+def _sigmoid_confidence(score: float) -> float:
+    return 1.0 / (1.0 + math.exp(-score))
 
 
 def _has_full_high_precision(candidate: CandidateDepartment) -> bool:
@@ -93,6 +99,7 @@ def _build_llm_prompt(
     candidates: list[CandidateDepartment],
     catalog: DepartmentsCatalog,
     top_k: int,
+    rules_context: RulesContext,
 ) -> tuple[str, str, list[str]]:
     """
     Возвращает (system_prompt, user_prompt, allowed_department_ids)
@@ -129,13 +136,20 @@ def _build_llm_prompt(
         "Запрещено выбирать department_id, которого нет в candidates.\n"
         "Отвечай СТРОГО валидным JSON без markdown и без лишнего текста.\n"
         "Если данных недостаточно — needs_human_review=true и задай questions.\n"
+        "Если основания общие (например, «представить сведения/информацию» без предмета контроля),\n"
+        "выбирай OUT_OF_SCOPE и needs_human_review=true.\n"
+        "Если триаж указывает на соисполнителя, можно заполнить secondary_department_ids.\n"
     )
+
+    matched_snippets = _extract_match_snippets(letter_text, top, limit=5)
 
     user = {
         "task": "route_letter",
         "allowed_department_ids": allowed_ids,
         "note": "Выбирай только из allowed_department_ids или OUT_OF_SCOPE.",
         "letter": {"text": letter_text[:12000]},
+        "match_snippets": matched_snippets,
+        "triage_review_reasons": rules_context.review_reasons,
         "candidates": candidates_payload,
         "department_cards": cards,
         "response_schema_example": {
@@ -155,6 +169,42 @@ def _build_llm_prompt(
     }
     user_text = json.dumps(user, ensure_ascii=False, indent=2)
     return system, user_text, allowed_ids
+
+
+def _strip_hit_label(hit: str) -> str:
+    if " (" in hit and hit.endswith(")"):
+        return hit.split(" (", 1)[0].strip()
+    return hit.strip()
+
+
+def _extract_match_snippets(
+    letter_text: str,
+    candidates: list[CandidateDepartment],
+    *,
+    limit: int,
+) -> list[str]:
+    lowered = letter_text.lower()
+    keywords: list[str] = []
+    for candidate in candidates:
+        for hit_list in candidate.keyword_hits.values():
+            for hit in hit_list:
+                text = _strip_hit_label(hit)
+                if text and text not in keywords:
+                    keywords.append(text)
+
+    snippets: list[str] = []
+    for keyword in keywords:
+        idx = lowered.find(keyword.lower())
+        if idx == -1:
+            continue
+        start = max(0, idx - 80)
+        end = min(len(letter_text), idx + len(keyword) + 80)
+        snippet = letter_text[start:end].strip()
+        if snippet and snippet not in snippets:
+            snippets.append(snippet)
+        if len(snippets) >= limit:
+            break
+    return snippets
 
 
 def _validate_llm_payload(payload: dict[str, Any], allowed_ids: list[str]) -> tuple[bool, str]:
@@ -211,9 +261,13 @@ def decide_routing(
     top_candidate = sorted_candidates[0]
     second_score = sorted_candidates[1].score if len(sorted_candidates) > 1 else 0.0
 
-    confidence = _gap_confidence(top_candidate.score, second_score)
+    gap_conf = _gap_confidence(top_candidate.score, second_score)
+    abs_conf = _sigmoid_confidence(max(top_candidate.score, 0.0))
+    confidence = 0.6 * gap_conf + 0.4 * abs_conf
     if not _has_full_high_precision(top_candidate):
         confidence = min(confidence, HIGH_PRECISION_CONFIDENCE_CAP)
+        if top_candidate.department_id in rules_context.rules_triggered:
+            confidence = min(confidence, TRIAGE_CONFIDENCE_CAP)
     if _is_medium_dominant(top_candidate):
         confidence *= MEDIUM_DOMINANCE_PENALTY
 
@@ -258,6 +312,7 @@ def decide_routing(
         candidates=sorted_candidates,
         catalog=catalog,
         top_k=llm_top_k,
+        rules_context=rules_context,
     )
 
     client = OllamaClient(
