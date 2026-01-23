@@ -15,9 +15,7 @@ class OllamaConfig:
 
 
 class OllamaClient:
-    """
-    Minimal Ollama /api/chat client (stdlib-only).
-    """
+    """Minimal Ollama /api/chat client (stdlib-only)."""
 
     def __init__(self, cfg: OllamaConfig):
         self.cfg = cfg
@@ -31,10 +29,9 @@ class OllamaClient:
                 {"role": "user", "content": user},
             ],
             "stream": False,
-            "options": {
-                "temperature": float(self.cfg.temperature),
-            },
+            "options": {"temperature": float(self.cfg.temperature)},
         }
+
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(
             url=url,
@@ -42,8 +39,9 @@ class OllamaClient:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
+
         with urllib.request.urlopen(req, timeout=self.cfg.timeout_s) as resp:
             resp_text = resp.read().decode("utf-8", errors="replace")
+
         obj = json.loads(resp_text)
-        # /api/chat -> {"message": {"content": "..."}}
         return (obj.get("message") or {}).get("content", "") or ""

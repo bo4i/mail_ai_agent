@@ -8,6 +8,7 @@ from router.models import Department, DepartmentsCatalog, KeywordSpec
 from router.text_processing import lemmatize_tokens, tokenize, top_terms
 
 MAX_STRUCTURAL_TERMS = 8
+
 STRUCTURAL_STOPWORDS = {
     "организация",
     "обеспечение",
@@ -30,44 +31,38 @@ STRUCTURAL_STOPWORDS = {
 }
 
 
-def _normalize_keywords(keywords: list[str | dict]) -> list[KeywordSpec]:
-    specs = []
+def _normalize_keywords(keywords: list[str | dict[str, Any]]) -> list[KeywordSpec]:
+    specs: list[KeywordSpec] = []
     for item in keywords:
         if isinstance(item, str):
             text = item
-            anchors = []
+            anchors: list[str] = []
         else:
-            text = item.get("text", "")
-            anchors = item.get("anchors", [])
+            text = str(item.get("text", ""))
+            anchors = list(item.get("anchors", []))
 
         tokens = tokenize(text)
         lemmas = lemmatize_tokens(tokens)
 
-        anchor_lemmas = []
+        anchor_lemmas: list[str] = []
         for anchor in anchors:
-            anchor_lemmas.extend(lemmatize_tokens(tokenize(anchor)))
+            anchor_lemmas.extend(lemmatize_tokens(tokenize(str(anchor))))
 
-        specs.append(
-            KeywordSpec(
-                text=text,
-                lemmas=lemmas,
-                anchors=anchor_lemmas,
-            )
-        )
+        specs.append(KeywordSpec(text=text, lemmas=lemmas, anchors=anchor_lemmas))
     return specs
 
 
 def _build_keyword_index(
-    routing_keywords: dict[str, list[str]],
-    out_of_scope: list[str],
+    routing_keywords: dict[str, list[Any]],
+    out_of_scope_keywords: list[Any],
     *,
     structural_terms: list[str] | None = None,
 ) -> dict[str, list[KeywordSpec]]:
     return {
-        "high_precision": _normalize_keywords(routing_keywords.get("high_precision", [])),
-        "medium_precision": _normalize_keywords(routing_keywords.get("medium_precision", [])),
-        "structural_terms": _normalize_keywords(structural_terms or []),
-        "out_of_scope": _normalize_keywords(out_of_scope),
+        "high_precision": _normalize_keywords(list(routing_keywords.get("high_precision", []))),
+        "medium_precision": _normalize_keywords(list(routing_keywords.get("medium_precision", []))),
+        "structural_terms": _normalize_keywords(list(structural_terms or [])),
+        "out_of_scope": _normalize_keywords(list(out_of_scope_keywords or [])),
     }
 
 
@@ -84,8 +79,10 @@ def _extract_structural_keywords(
             texts.extend(str(item) for item in value if item)
         elif isinstance(value, str):
             texts.append(value)
+
     if not texts:
         return []
+
     candidates = top_terms(texts, max_terms=max_terms, stopwords=STRUCTURAL_STOPWORDS)
     return [term for term in candidates if term not in existing_lemmas]
 
@@ -95,16 +92,23 @@ def _ensure_list(data: Any) -> list[dict[str, Any]]:
         return data
     if isinstance(data, dict):
         return [data]
-    msg = "Catalog payload must be an object or list of objects"
-    raise ValueError(msg)
+    raise ValueError("Catalog payload must be an object or list of objects")
 
 
 def load_departments_catalog(path: Path) -> DepartmentsCatalog:
     payload = json.loads(path.read_text(encoding="utf-8"))
+
+    # Поддержка обоих форматов:
+    # 1) {"catalog_version": "...", "departments": [ ... ]}
+    # 2) [ ... ] (список отделов)
+    # 3) { ... } (один отдел)
     if isinstance(payload, dict) and "departments" in payload:
         items = _ensure_list(payload.get("departments"))
+        catalog_version = payload.get("catalog_version")
     else:
         items = _ensure_list(payload)
+        catalog_version = payload.get("catalog_version") if isinstance(payload, dict) else None
+
     department_ids: set[str] = set()
     departments: list[Department] = []
 
@@ -123,12 +127,14 @@ def load_departments_catalog(path: Path) -> DepartmentsCatalog:
         if triage_rules is None:
             raise ValueError(f"triage_rules missing for {department_id}")
 
+        # оставляем только list-поля
         routing_keywords = {
-            key: list(value)
-            for key, value in routing_keywords.items()
-            if isinstance(value, list)
+            key: list(value) for key, value in routing_keywords.items() if isinstance(value, list)
         }
-        out_of_scope_keywords = routing_keywords.get("out_of_scope", [])
+
+        # ВАЖНО: штрафующие ключи берём из routing_keywords.out_of_scope (а не из верхнего out_of_scope-описания)
+        out_of_scope_keywords = list(routing_keywords.get("out_of_scope", []))
+
         keyword_index = _build_keyword_index(routing_keywords, out_of_scope_keywords)
         existing_lemmas = {
             lemma
@@ -136,11 +142,13 @@ def load_departments_catalog(path: Path) -> DepartmentsCatalog:
             for spec in specs
             for lemma in spec.lemmas
         }
+
         structural_terms = _extract_structural_keywords(
             item,
             existing_lemmas=existing_lemmas,
             max_terms=MAX_STRUCTURAL_TERMS,
         )
+
         if structural_terms:
             routing_keywords["structural_terms"] = list(structural_terms)
             keyword_index = _build_keyword_index(
@@ -160,8 +168,4 @@ def load_departments_catalog(path: Path) -> DepartmentsCatalog:
             )
         )
 
-    catalog_version = payload.get("catalog_version") if isinstance(payload, dict) else None
-    return DepartmentsCatalog(
-        departments=departments,
-        catalog_version=catalog_version or "dev",
-    )
+    return DepartmentsCatalog(departments=departments, catalog_version=catalog_version or "dev")

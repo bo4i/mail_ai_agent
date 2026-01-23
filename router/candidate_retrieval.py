@@ -5,26 +5,28 @@ from router.text_processing import normalize_text
 
 HIGH_PRECISION_WEIGHT = 3.0
 MEDIUM_PRECISION_WEIGHT = 1.0
-STRUCTURAL_TERM_WEIGHT = 0.2
+STRUCTURAL_WEIGHT = 0.5
+
 OUT_OF_SCOPE_PENALTY = 2.0
 RULE_TRIGGERED_BOOST = 2.0
 HIGH_PRIORITY_EXTRA_BOOST = 2.0
 
-HIGH_PRECISION_MIN_COVERAGE = 1.0
+# Реальный текст редко совпадает 100% по фразе → 1.0 слишком строго.
+HIGH_PRECISION_MIN_COVERAGE = 0.66
 MEDIUM_PRECISION_MIN_COVERAGE = 0.66
+STRUCTURAL_MIN_COVERAGE = 1.0  # структурные термины обычно одиночные леммы
 OUT_OF_SCOPE_MIN_COVERAGE = 0.5
 
 
 def _keyword_coverage(keyword: KeywordSpec, lemma_set: set[str]) -> float:
-    # 1. Проверка якорей
+    # 1) Проверка якорей
     if keyword.anchors:
         if not all(anchor in lemma_set for anchor in keyword.anchors):
             return 0.0
 
-    # 2. Coverage по леммам
+    # 2) Coverage по леммам
     if not keyword.lemmas:
         return 0.0
-
     matched = sum(1 for lemma in keyword.lemmas if lemma in lemma_set)
     return matched / len(keyword.lemmas)
 
@@ -68,15 +70,14 @@ def _collect_out_of_scope(
     return hits, penalty
 
 
-def retrieve_candidates(
-    clean_text_for_llm: str,
-    catalog: DepartmentsCatalog,
-) -> list[CandidateDepartment]:
+def retrieve_candidates(clean_text_for_llm: str, catalog: DepartmentsCatalog) -> list[CandidateDepartment]:
     normalized = normalize_text(clean_text_for_llm)
     lemma_set = normalized.lemma_set
+
     candidates: list[CandidateDepartment] = []
     for department in catalog.departments:
         keyword_index = department.keyword_index
+
         high_hits, high_score = _collect_hits(
             keyword_index.get("high_precision", []),
             lemma_set,
@@ -92,16 +93,16 @@ def retrieve_candidates(
         structural_hits, structural_score = _collect_hits(
             keyword_index.get("structural_terms", []),
             lemma_set,
-            min_coverage=MEDIUM_PRECISION_MIN_COVERAGE,
-            weight=STRUCTURAL_TERM_WEIGHT,
+            min_coverage=STRUCTURAL_MIN_COVERAGE,
+            weight=STRUCTURAL_WEIGHT,
         )
         out_of_scope_hits, out_penalty = _collect_out_of_scope(
             keyword_index.get("out_of_scope", []),
             lemma_set,
             min_coverage=OUT_OF_SCOPE_MIN_COVERAGE,
         )
-        score = high_score + medium_score + structural_score - out_penalty
 
+        score = high_score + medium_score + structural_score - out_penalty
         candidates.append(
             CandidateDepartment(
                 department_id=department.department_id,
@@ -131,6 +132,7 @@ def apply_rules_boosts(
 ) -> list[CandidateDepartment]:
     if not rules_context.rules_triggered and not rules_context.priority_boosts:
         return candidates
+
     boosted: list[CandidateDepartment] = []
     for candidate in candidates:
         score = candidate.score
@@ -138,6 +140,7 @@ def apply_rules_boosts(
             score += RULE_TRIGGERED_BOOST
         if rules_context.priority_boosts.get(candidate.department_id, 0) > 0:
             score += HIGH_PRIORITY_EXTRA_BOOST
+
         boosted.append(
             CandidateDepartment(
                 department_id=candidate.department_id,
@@ -147,4 +150,5 @@ def apply_rules_boosts(
                 score_breakdown=dict(candidate.score_breakdown),
             )
         )
+
     return sorted(boosted, key=lambda item: item.score, reverse=True)

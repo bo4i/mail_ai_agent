@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from dataclasses import dataclass
-import re
-from typing import Iterable
-
 from functools import lru_cache
+from typing import Iterable
 
 try:
     from pymorphy3 import MorphAnalyzer
-except ImportError:
+except ImportError:  # pragma: no cover
     try:
         from pymorphy2 import MorphAnalyzer
-    except ImportError:
-        MorphAnalyzer = None
+    except ImportError:  # pragma: no cover
+        MorphAnalyzer = None  # type: ignore
 
 _TOKEN_SPLIT_RE = re.compile(r"[^\wа-яё]+", re.IGNORECASE)
 _HAS_LETTER_RE = re.compile(r"[a-zа-яё]", re.IGNORECASE)
@@ -27,8 +26,9 @@ class NormalizedText:
 
 
 def tokenize(text: str) -> list[str]:
-    lowered = text.lower()
+    lowered = (text or "").lower()
     cleaned = _TOKEN_SPLIT_RE.sub(" ", lowered)
+
     tokens: list[str] = []
     for token in cleaned.split():
         if len(token) <= 2:
@@ -71,7 +71,7 @@ def normalize_text(text: str) -> NormalizedText:
 def top_terms(texts: Iterable[str], *, max_terms: int, stopwords: set[str]) -> list[str]:
     tokens: list[str] = []
     for text in texts:
-        tokens.extend(tokenize(text))
+        tokens.extend(tokenize(str(text)))
     lemmas = lemmatize_tokens(tokens)
     filtered = [lemma for lemma in lemmas if lemma not in stopwords]
     counts = Counter(filtered)
